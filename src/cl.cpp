@@ -1,5 +1,6 @@
 #include <cassert>
 #include <mutex>
+#include <string>
 #include <memory>
 #include <new>
 #include <utility>
@@ -8,10 +9,13 @@
 
 struct libysmm_cl_handle
 {
-    libysmm_cl_handle(cl_context ctx, cl_device_id dev)
-        : ctx_(ctx)
-        , dev_(dev)
-    {}
+    libysmm_cl_handle(cl_context ctx, cl_device_id dev, int flags);
+
+    std::string
+    serialize() const;
+
+    void
+    unserialize(const std::string &state, int flags);
 
     libysmm_cl_smm_kernel *
     smm_kernel(const libysmm_smm_t *smm);
@@ -40,6 +44,32 @@ struct libysmm_cl_smm_kernel
     size_t gs_[3];
     size_t ls_[3];
 };
+
+libysmm_cl_handle::libysmm_cl_handle(
+    cl_context ctx,
+    cl_device_id dev,
+    int flags)
+    : ctx_(ctx)
+    , dev_(dev)
+{
+    assert(0 == flags);
+}
+
+std::string
+libysmm_cl_handle::serialize() const
+{
+    return "";
+}
+
+void
+libysmm_cl_handle::unserialize(
+    const std::string &state,
+    int)
+{
+    if ("" != state)
+        throw CL_INVALID_VALUE;
+}
+
 
 libysmm_cl_smm_kernel *
 libysmm_cl_handle::smm_kernel(const libysmm_smm_t *smm)
@@ -133,8 +163,6 @@ libysmm_cl_handle::smm_kernel(const libysmm_smm_t *smm)
     smmk->gs_[0] = ((m + smmk->ls_[0] - 1) / smmk->ls_[0])*smmk->ls_[0];
     smmk->gs_[1] = ((n + smmk->ls_[1] - 1) / smmk->ls_[1])*smmk->ls_[1];
 
-    printf("%p\n", smmk->kernel_);
-
     return smmk;
 }
 
@@ -168,6 +196,12 @@ libysmm_cl_smm_kernel::enqueue(
                                   event);
 }
 
+libysmm_support_level_t
+libysmm_cl_get_support_level(cl_device_id id)
+{
+    return LIBYSMM_SUPPORT_LEVEL_BASIC;
+}
+
 cl_int
 libysmm_cl_create_handle(
     libysmm_cl_handle_t *h,
@@ -175,12 +209,11 @@ libysmm_cl_create_handle(
     cl_device_id dev,
     int flags)
 {
-    assert(0 == flags);
     assert(nullptr != h);
 
     try
     {
-        *h = new libysmm_cl_handle(ctx, dev);
+        *h = new libysmm_cl_handle(ctx, dev, flags);
     }
     catch (int err)
     {
@@ -201,6 +234,62 @@ libysmm_cl_destroy_handle(
     assert(nullptr != h);
 
     delete h;
+}
+
+cl_int
+libysmm_cl_serialize(
+    libysmm_cl_handle_t h,
+    char *buf,
+    size_t *nbytes)
+{
+    assert(nullptr != h);
+
+    if (nullptr == nbytes || (nullptr == buf && *nbytes))
+        return CL_INVALID_VALUE;
+
+    size_t nb = *nbytes;
+
+    try
+    {
+        const std::string state = h->serialize();
+
+        *nbytes = state.length();
+
+        if (*nbytes <= nb)
+        {
+            state.copy(buf, *nbytes);
+            return CL_SUCCESS;
+        }
+        else
+        {
+            return CL_OUT_OF_HOST_MEMORY;
+        }
+    }
+    catch (int err)
+    {
+        return err;
+    }
+}
+
+cl_int
+libysmm_cl_unserialize(
+    libysmm_cl_handle_t h,
+    char *state,
+    size_t nbytes,
+    int flags)
+{
+    assert(nullptr != h);
+
+    try
+    {
+        h->unserialize(std::string(state, nbytes), flags);
+    }
+    catch (int err)
+    {
+        return err;
+    }
+
+    return CL_SUCCESS;
 }
 
 cl_int

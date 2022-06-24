@@ -17,6 +17,14 @@ typedef struct libysmm_cl_handle *libysmm_cl_handle_t;
 typedef struct libysmm_cl_smm_kernel *libysmm_cl_smm_kernel_t;
 
 /**
+ * Returns the support level for an OpenCL device.
+ */
+libysmm_support_level_t
+libysmm_cl_get_support_level(
+    cl_device_id id
+);
+
+/**
  * Creates a library handle.  Flags must be zero.
  */
 cl_int
@@ -33,6 +41,27 @@ libysmm_cl_create_handle(
 void
 libysmm_cl_destroy_handle(
     libysmm_cl_handle_t h
+);
+
+/**
+ * Obtains the internal state.
+ */
+cl_int
+libysmm_cl_serialize(
+    libysmm_cl_handle_t h,
+    char *buf,
+    size_t *nbytes
+);
+
+/**
+ *
+ */
+cl_int
+libysmm_cl_unserialize(
+    libysmm_cl_handle_t h,
+    char *state,
+    size_t *nbytes,
+    int flags
 );
 
 /**
