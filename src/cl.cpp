@@ -51,6 +51,8 @@ libysmm_cl_handle::smm_kernel(const libysmm_smm_t *smm)
     int m = smm->m, n = smm->n, k = smm->k;
     int lda = smm->lda, ldb = smm->ldb, ldc = smm->ldc;
 
+    double alpha = smm->alpha, beta = smm->beta;
+
     // Validate the shape
     if (m <= 0 || n <= 0 || k <= 0)
         throw CL_INVALID_VALUE;
@@ -87,6 +89,7 @@ libysmm_cl_handle::smm_kernel(const libysmm_smm_t *smm)
             const int M = %d, N = %d, K = %d, lda = %d, ldb = %d, ldc = %d;
             const int rx = get_global_id(0);
             const int cx = get_global_id(1);
+            const float alpha = %.9g, beta = %.9g;
 
             if (rx < M && cx < N)
             {
@@ -94,14 +97,14 @@ libysmm_cl_handle::smm_kernel(const libysmm_smm_t *smm)
                 for (int k = 0; k < K; k++)
                     acc += a[rx*lda + k] * b[k*ldb + cx];
 
-                c[rx*ldc + cx] = acc;
+                c[rx*ldc + cx] = alpha*acc + beta*c[rx*ldc + cx];
             }
         }
     )""";
 
-    int ksz = snprintf(nullptr, 0, ktpl, m, n, k, lda, ldb, ldc);
+    int ksz = snprintf(nullptr, 0, ktpl, m, n, k, lda, ldb, ldc, alpha, beta);
     auto ksrc = std::make_unique<char[]>(ksz + 1);
-    snprintf(ksrc.get(), ksz + 1, ktpl, m, n, k, lda, ldb, ldc);
+    snprintf(ksrc.get(), ksz + 1, ktpl, m, n, k, lda, ldb, ldc, alpha, beta);
 
     puts(ksrc.get());
 
