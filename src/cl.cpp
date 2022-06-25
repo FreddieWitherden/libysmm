@@ -136,8 +136,6 @@ libysmm_cl_handle::smm_kernel(const libysmm_smm_t *smm)
     auto ksrc = std::make_unique<char[]>(ksz + 1);
     snprintf(ksrc.get(), ksz + 1, ktpl, m, n, k, lda, ldb, ldc, alpha, beta);
 
-    puts(ksrc.get());
-
     cl_int err;
     const char *ksrcp = ksrc.get();
     auto prg = clCreateProgramWithSource(ctx_, 1, &ksrcp, nullptr, &err);
