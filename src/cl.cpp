@@ -5,8 +5,13 @@
 #include <new>
 #include <utility>
 
+#include <nlohmann/json.hpp>
+#include <inja/inja.hpp>
+
 #include "cl.h"
 #include "config.h"
+
+using json = nlohmann::json;
 
 struct libysmm_cl_handle
 {
@@ -119,10 +124,11 @@ libysmm_cl_handle::smm_kernel(
            __global const float* restrict b,
            __global float* restrict c)
         {
-            const int M = %d, N = %d, K = %d, lda = %d, ldb = %d, ldc = %d;
+            const int M = {{ M }}, N = {{ N }}, K = {{ K }};
+            const int lda = {{ lda }}, ldb = {{ ldb }}, ldc = {{ ldc }};
             const int rx = get_global_id(0);
             const int cx = get_global_id(1);
-            const float alpha = %.9g, beta = %.9g;
+            const float alpha = {{ alpha }}, beta = {{ beta }};
 
             if (rx < M && cx < N)
             {
@@ -135,12 +141,15 @@ libysmm_cl_handle::smm_kernel(
         }
     )""";
 
-    int ksz = snprintf(nullptr, 0, ktpl, m, n, k, lda, ldb, ldc, alpha, beta);
-    auto ksrc = std::make_unique<char[]>(ksz + 1);
-    snprintf(ksrc.get(), ksz + 1, ktpl, m, n, k, lda, ldb, ldc, alpha, beta);
+    json tplargs = {
+        {"M", m}, {"N", n}, {"K", k}, {"lda", lda}, {"ldb", ldb}, {"ldc", ldc},
+        {"alpha", alpha}, {"beta", beta}
+    };
+
+    std::string ksrc = inja::render(ktpl, tplargs);
+    const char *ksrcp = ksrc.c_str();
 
     cl_int err;
-    const char *ksrcp = ksrc.get();
     auto prg = clCreateProgramWithSource(ctx_, 1, &ksrcp, nullptr, &err);
     if (err < 0)
         throw err;
