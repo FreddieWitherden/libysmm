@@ -98,6 +98,14 @@ libysmm_cl_enqueue_smm_kernel(
     cl_event* event
 );
 
+void
+libysmm_cl_get_version(
+    int *major,
+    int *minor,
+    int *patch,
+    const char **vstr
+);
+
 #ifdef __cplusplus
 }
 #endif

@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "cl.h"
+#include "config.h"
 
 struct libysmm_cl_handle
 {
@@ -342,4 +343,24 @@ libysmm_cl_enqueue_smm_kernel(
 
     return smmk->enqueue(a, b, c, queue, num_events_in_wait_list,
                          event_wait_list, event);
+}
+
+void
+libysmm_cl_get_version(
+    int *major,
+    int *minor,
+    int *patch,
+    const char **vstr)
+{
+    if (major)
+        *major = LIBYSMM_VERSION_MAJOR;
+
+    if (minor)
+        *minor = LIBYSMM_VERSION_MINOR;
+
+    if (patch)
+        *patch = LIBYSMM_VERSION_PATCH;
+
+    if (vstr)
+        *vstr = LIBYSMM_VERSION;
 }
