@@ -72,7 +72,8 @@ libysmm_cl_create_smm_kernel(
     libysmm_cl_smm_kernel_t *smmk,
     libysmm_cl_handle_t h,
     const libysmm_smm_t *smm,
-    int sizeof_smm
+    int sizeof_smm,
+    double timeout
 );
 
 /**

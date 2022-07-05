@@ -19,7 +19,7 @@ struct libysmm_cl_handle
     unserialize(const std::string &state, int flags);
 
     libysmm_cl_smm_kernel *
-    smm_kernel(const libysmm_smm_t *smm);
+    smm_kernel(const libysmm_smm_t *smm, double timeout);
 
     cl_context ctx_;
     cl_device_id dev_;
@@ -73,7 +73,9 @@ libysmm_cl_handle::unserialize(
 
 
 libysmm_cl_smm_kernel *
-libysmm_cl_handle::smm_kernel(const libysmm_smm_t *smm)
+libysmm_cl_handle::smm_kernel(
+    const libysmm_smm_t *smm,
+    double)
 {
     libysmm_dtype_t dtype = smm->dtype;
     libysmm_layout_t layout = smm->layout;
@@ -296,7 +298,8 @@ libysmm_cl_create_smm_kernel(
     libysmm_cl_smm_kernel_t *smmk,
     libysmm_cl_handle_t h,
     const libysmm_smm_t *smm,
-    int sizeof_smm
+    int sizeof_smm,
+    double timeout
 )
 {
     assert(nullptr != h);
@@ -305,7 +308,7 @@ libysmm_cl_create_smm_kernel(
 
     try
     {
-        *smmk = h->smm_kernel(smm);
+        *smmk = h->smm_kernel(smm, timeout);
     }
     catch (int err)
     {
