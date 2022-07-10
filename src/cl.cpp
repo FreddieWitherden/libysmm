@@ -112,7 +112,7 @@ struct libysmm_cl_handle
 
     cl_context ctx_;
     libysmm_cl_device_properties dev_props_;
-    std::mutex lock_;
+    mutable std::mutex lock_;
 };
 
 struct libysmm_cl_smm_kernel
@@ -148,6 +148,8 @@ libysmm_cl_handle::libysmm_cl_handle(
 std::string
 libysmm_cl_handle::serialize() const
 {
+    std::scoped_lock guard(lock_);
+
     return "";
 }
 
@@ -156,6 +158,8 @@ libysmm_cl_handle::unserialize(
     const std::string &state,
     int)
 {
+    std::scoped_lock guard(lock_);
+
     if ("" != state)
         throw CL_INVALID_VALUE;
 }
@@ -166,6 +170,8 @@ libysmm_cl_handle::smm_kernel(
     const libysmm_smm_t *smm,
     double)
 {
+    std::scoped_lock guard(lock_);
+
     libysmm_dtype_t dtype = smm->dtype;
     libysmm_layout_t layout = smm->layout;
     libysmm_transpose_t transpose = smm->transpose;
