@@ -2,7 +2,6 @@
 #include <mutex>
 #include <string>
 #include <memory>
-#include <new>
 #include <utility>
 
 #include <nlohmann/json.hpp>
@@ -16,6 +15,83 @@ using json = nlohmann::json;
 const char *kern_basic =
 #include "kernels/basic.cl"
 ;
+
+template<typename T, typename... Ts>
+std::string
+libysmm_query_string(const T& fn, Ts... args)
+{
+    // Query the size
+    size_t sz;
+    fn(args..., 0, nullptr, &sz);
+
+    // Allocate storage
+    char *temp = new char[sz];
+    fn(args..., sz, temp, nullptr);
+
+    // Construct a string
+    std::string ret(temp);
+    delete[] temp;
+
+    return ret;
+}
+
+struct libysmm_cl_platform
+{
+    libysmm_cl_platform(cl_platform_id platform);
+
+    cl_platform_id plat_id;
+    std::string name;
+    std::string extensions;
+};
+
+libysmm_cl_platform::libysmm_cl_platform(cl_platform_id platform)
+    : plat_id(platform)
+{
+    // Query the name
+    name = libysmm_query_string(clGetPlatformInfo, platform, CL_PLATFORM_NAME);
+
+    // Query the extensions
+    extensions = libysmm_query_string(clGetPlatformInfo, platform,
+                                      CL_PLATFORM_EXTENSIONS);
+}
+
+struct libysmm_cl_device_properties
+{
+    libysmm_cl_device_properties(cl_device_id dev);
+    ~libysmm_cl_device_properties();
+
+    cl_device_id dev_id;
+    libysmm_cl_platform *platform;
+    std::string name;
+    std::string extensions;
+    bool has_dp;
+};
+
+libysmm_cl_device_properties::libysmm_cl_device_properties(cl_device_id dev)
+    : dev_id(dev)
+{
+    // Query the platform
+    cl_platform_id plat_id;
+    clGetDeviceInfo(dev, CL_DEVICE_PLATFORM, sizeof(plat_id), &plat_id,
+                    nullptr);
+
+    platform = new libysmm_cl_platform(plat_id);
+
+    // Query the name
+    name = libysmm_query_string(clGetDeviceInfo, dev, CL_DEVICE_NAME);
+
+    // Query the extensions
+    extensions = libysmm_query_string(clGetDeviceInfo, dev,
+                                      CL_DEVICE_EXTENSIONS);
+
+    // See if we have double precision support
+    has_dp = extensions.find("cl_khr_fp64") != extensions.npos;
+}
+
+libysmm_cl_device_properties::~libysmm_cl_device_properties()
+{
+    delete platform;
+}
 
 struct libysmm_cl_handle
 {
@@ -31,7 +107,7 @@ struct libysmm_cl_handle
     smm_kernel(const libysmm_smm_t *smm, double timeout);
 
     cl_context ctx_;
-    cl_device_id dev_;
+    libysmm_cl_device_properties dev_props_;
     std::mutex lock_;
 };
 
@@ -60,7 +136,7 @@ libysmm_cl_handle::libysmm_cl_handle(
     cl_device_id dev,
     int flags)
     : ctx_(ctx)
-    , dev_(dev)
+    , dev_props_(dev)
 {
     assert(0 == flags);
 }
@@ -135,7 +211,7 @@ libysmm_cl_handle::smm_kernel(
     if (err < 0)
         throw err;
 
-    err = clBuildProgram(prg, 1, &dev_, nullptr, nullptr, nullptr);
+    err = clBuildProgram(prg, 1, &dev_props_.dev_id, nullptr, nullptr, nullptr);
     if (err < 0)
     {
         clReleaseProgram(prg);
