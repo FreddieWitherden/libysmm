@@ -22,11 +22,13 @@ libysmm_query_string(const T& fn, Ts... args)
 {
     // Query the size
     size_t sz;
-    fn(args..., 0, nullptr, &sz);
+    if (cl_int err = fn(args..., 0, nullptr, &sz); err < 0)
+        throw err;
 
     // Allocate storage
     char *temp = new char[sz];
-    fn(args..., sz, temp, nullptr);
+    if (cl_int err = fn(args..., sz, temp, nullptr); err < 0)
+        throw err;
 
     // Construct a string
     std::string ret(temp);
@@ -72,8 +74,10 @@ libysmm_cl_device_properties::libysmm_cl_device_properties(cl_device_id dev)
 {
     // Query the platform
     cl_platform_id plat_id;
-    clGetDeviceInfo(dev, CL_DEVICE_PLATFORM, sizeof(plat_id), &plat_id,
-                    nullptr);
+    cl_int err = clGetDeviceInfo(dev, CL_DEVICE_PLATFORM, sizeof(plat_id),
+                                 &plat_id, nullptr);
+    if (err < 0)
+        throw err;
 
     platform = new libysmm_cl_platform(plat_id);
 
@@ -282,7 +286,7 @@ libysmm_cl_create_handle(
     {
         *h = new libysmm_cl_handle(ctx, dev, flags);
     }
-    catch (int err)
+    catch (cl_int err)
     {
         return err;
     }
@@ -332,7 +336,7 @@ libysmm_cl_serialize(
             return CL_OUT_OF_HOST_MEMORY;
         }
     }
-    catch (int err)
+    catch (cl_int err)
     {
         return err;
     }
@@ -351,7 +355,7 @@ libysmm_cl_unserialize(
     {
         h->unserialize(std::string(state, nbytes), flags);
     }
-    catch (int err)
+    catch (cl_int err)
     {
         return err;
     }
@@ -376,7 +380,7 @@ libysmm_cl_create_smm_kernel(
     {
         *smmk = h->smm_kernel(smm, timeout);
     }
-    catch (int err)
+    catch (cl_int err)
     {
         return err;
     }
