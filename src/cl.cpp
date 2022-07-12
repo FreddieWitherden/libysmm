@@ -235,10 +235,9 @@ libysmm_cl_handle::smm_kernel(
         throw err;
     }
 
-    smmk->work_dim_ = 2;
-    smmk->ls_[0] = smmk->ls_[1] = 16;
-    smmk->gs_[0] = ((m + smmk->ls_[0] - 1) / smmk->ls_[0])*smmk->ls_[0];
-    smmk->gs_[1] = ((n + smmk->ls_[1] - 1) / smmk->ls_[1])*smmk->ls_[1];
+    smmk->work_dim_ = 1;
+    smmk->ls_[0] = 32;
+    smmk->gs_[0] = ((n + smmk->ls_[0] - 1) / smmk->ls_[0])*smmk->ls_[0];
 
     return smmk;
 }
