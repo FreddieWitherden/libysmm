@@ -232,7 +232,7 @@ libysmm_cl_handle::smm_kernel(
 
     json tplargs = {
         {"M", m}, {"N", n}, {"K", k}, {"lda", lda}, {"ldb", ldb}, {"ldc", ldc},
-        {"alpha", alpha}, {"beta", beta}
+        {"alpha", alpha}, {"beta", beta}, {"TM", 8}
     };
 
     std::string ksrc = inja::render(kern_basic, tplargs);
@@ -258,7 +258,7 @@ libysmm_cl_handle::smm_kernel(
     }
 
     smmk->work_dim_ = 1;
-    smmk->ls_[0] = 32;
+    smmk->ls_[0] = 64;
     smmk->gs_[0] = ((n + smmk->ls_[0] - 1) / smmk->ls_[0])*smmk->ls_[0];
 
     return smmk;
