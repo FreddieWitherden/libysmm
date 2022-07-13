@@ -103,8 +103,14 @@ libysmm_cl_enqueue_smm_kernel(
     libysmm_cl_smm_kernel_t smmk,
     cl_command_queue queue,
     cl_uint num_events_in_wait_list,
-    const cl_event* event_wait_list,
-    cl_event* event
+    const cl_event *event_wait_list,
+    cl_event *event
+);
+
+cl_int
+libysmm_cl_clone_smm_kernel(
+    libysmm_cl_smm_kernel_t smmk,
+    libysmm_cl_smm_kernel_t *nsmmk
 );
 
 void

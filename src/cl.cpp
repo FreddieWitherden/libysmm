@@ -118,6 +118,7 @@ struct libysmm_cl_handle
 struct libysmm_cl_smm_kernel
 {
     ~libysmm_cl_smm_kernel();
+    libysmm_cl_smm_kernel *clone();
 
     cl_int
     bind(cl_mem a, cl_mem b, cl_mem c);
@@ -166,6 +167,25 @@ libysmm_cl_handle::unserialize(
         throw CL_INVALID_VALUE;
 }
 
+libysmm_cl_smm_kernel *
+libysmm_cl_smm_kernel::clone()
+{
+    auto newk = new libysmm_cl_smm_kernel(*this);
+
+    if (kernel_)
+    {
+        cl_int err;
+        newk->kernel_ = clCloneKernel(kernel_, &err);
+
+        if (err < 0)
+        {
+            delete newk;
+            throw err;
+        }
+    }
+
+    return newk;
+}
 
 libysmm_cl_smm_kernel *
 libysmm_cl_handle::smm_kernel(
@@ -439,6 +459,31 @@ libysmm_cl_enqueue_smm_kernel(
 
     return smmk->enqueue(queue, num_events_in_wait_list, event_wait_list,
                          event);
+}
+
+cl_int
+libysmm_cl_clone_smm_kernel(
+    libysmm_cl_smm_kernel_t smmk,
+    libysmm_cl_smm_kernel_t *nsmmk
+)
+{
+    assert(nullptr != smmk);
+    assert(nullptr != nsmmk);
+
+    try
+    {
+        *nsmmk = smmk->clone();
+    }
+    catch (cl_int err)
+    {
+        return err;
+    }
+    catch (const std::bad_alloc&)
+    {
+        return CL_OUT_OF_HOST_MEMORY;
+    }
+
+    return CL_SUCCESS;
 }
 
 void
