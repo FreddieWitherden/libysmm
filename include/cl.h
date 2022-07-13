@@ -85,14 +85,22 @@ libysmm_cl_destory_smm_kernel(
 );
 
 /**
+ * Binds an kernels arguments.
+ */
+cl_int
+libysmm_cl_bind_smm_kernel(
+    libysmm_cl_smm_kernel_t smmk,
+    cl_mem a,
+    cl_mem b,
+    cl_mem c
+);
+
+/**
  * Executes a kernel.
  */
 cl_int
 libysmm_cl_enqueue_smm_kernel(
     libysmm_cl_smm_kernel_t smmk,
-    cl_mem a,
-    cl_mem b,
-    cl_mem c,
     cl_command_queue queue,
     cl_uint num_events_in_wait_list,
     const cl_event* event_wait_list,

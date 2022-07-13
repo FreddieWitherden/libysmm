@@ -120,7 +120,14 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    err = libysmm_cl_enqueue_smm_kernel(smmk, bufA, bufB, bufC, queue, 0, NULL, NULL);
+    err = libysmm_cl_bind_smm_kernel(smmk, bufA, bufB, bufC);
+    if (err < 0)
+    {
+        perror("Couldn't create a kernel");
+        exit(1);
+    }
+
+    err = libysmm_cl_enqueue_smm_kernel(smmk, queue, 0, NULL, NULL);
     if (err < 0)
     {
         perror("Couldn't enqueue a kernel");
@@ -146,7 +153,7 @@ int main(int argc, char *argv[])
     gettimeofday(&begin, NULL);
     for (int i = 0; i < NREPS; i++)
     {
-        err = libysmm_cl_enqueue_smm_kernel(smmk, bufA, bufB, bufC, queue, 0, NULL, NULL);
+        err = libysmm_cl_enqueue_smm_kernel(smmk, queue, 0, NULL, NULL);
         if (err < 0)
         {
             perror("Couldn't enqueue a kernel");

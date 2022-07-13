@@ -120,8 +120,10 @@ struct libysmm_cl_smm_kernel
     ~libysmm_cl_smm_kernel();
 
     cl_int
-    enqueue(cl_mem a, cl_mem b, cl_mem c,
-            cl_command_queue queue,
+    bind(cl_mem a, cl_mem b, cl_mem c);
+
+    cl_int
+    enqueue(cl_command_queue queue,
             cl_uint num_events_in_wait_list,
             const cl_event* event_wait_list,
             cl_event* event);
@@ -249,14 +251,10 @@ libysmm_cl_smm_kernel::~libysmm_cl_smm_kernel()
 }
 
 cl_int
-libysmm_cl_smm_kernel::enqueue(
+libysmm_cl_smm_kernel::bind(
     cl_mem a,
     cl_mem b,
-    cl_mem c,
-    cl_command_queue queue,
-    cl_uint num_events_in_wait_list,
-    const cl_event *event_wait_list,
-    cl_event *event)
+    cl_mem c)
 {
     if (auto err = clSetKernelArg(kernel_, 0, sizeof(a), &a); err < 0)
         return err;
@@ -267,6 +265,17 @@ libysmm_cl_smm_kernel::enqueue(
     if (auto err = clSetKernelArg(kernel_, 2, sizeof(c), &c); err < 0)
         return err;
 
+    return CL_SUCCESS;
+}
+
+
+cl_int
+libysmm_cl_smm_kernel::enqueue(
+    cl_command_queue queue,
+    cl_uint num_events_in_wait_list,
+    const cl_event *event_wait_list,
+    cl_event *event)
+{
     return clEnqueueNDRangeKernel(queue, kernel_, work_dim_, nullptr, gs_, ls_,
                                   num_events_in_wait_list, event_wait_list,
                                   event);
@@ -407,11 +416,20 @@ libysmm_cl_destory_smm_kernel(
 }
 
 cl_int
-libysmm_cl_enqueue_smm_kernel(
+libysmm_cl_bind_smm_kernel(
     libysmm_cl_smm_kernel_t smmk,
     cl_mem a,
     cl_mem b,
-    cl_mem c,
+    cl_mem c)
+{
+    assert(nullptr != smmk);
+
+    return smmk->bind(a, b, c);
+}
+
+cl_int
+libysmm_cl_enqueue_smm_kernel(
+    libysmm_cl_smm_kernel_t smmk,
     cl_command_queue queue,
     cl_uint num_events_in_wait_list,
     const cl_event* event_wait_list,
@@ -419,8 +437,8 @@ libysmm_cl_enqueue_smm_kernel(
 {
     assert(nullptr != smmk);
 
-    return smmk->enqueue(a, b, c, queue, num_events_in_wait_list,
-                         event_wait_list, event);
+    return smmk->enqueue(queue, num_events_in_wait_list, event_wait_list,
+                         event);
 }
 
 void
