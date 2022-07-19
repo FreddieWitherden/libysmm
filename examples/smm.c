@@ -86,11 +86,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    cl_mem bufA = clCreateBuffer(ctx, CL_MEM_READ_ONLY, M*K*sizeof(*A), NULL, &err);
     cl_mem bufB = clCreateBuffer(ctx, CL_MEM_READ_ONLY, K*N*sizeof(*B), NULL, &err);
     cl_mem bufC = clCreateBuffer(ctx, CL_MEM_READ_WRITE, M*N*sizeof(*C), NULL, &err);
 
-    err = clEnqueueWriteBuffer(queue, bufA, CL_TRUE, 0, M*K*sizeof(*A), A, 0, NULL, NULL);
     err = clEnqueueWriteBuffer(queue, bufB, CL_TRUE, 0, K*N*sizeof(*B), B, 0, NULL, NULL);
     err = clEnqueueWriteBuffer(queue, bufC, CL_TRUE, 0, M*N*sizeof(*C), C, 0, NULL, NULL);
 
@@ -109,21 +107,21 @@ int main(int argc, char *argv[])
         .m = M, .n = N, .k = K,
         .lda = K, .ldb = N, .ldc = N,
         .alpha = 1.0, .beta = 0,
-        .flags = 0
+        .a = A, .flags = 0
     };
 
     libysmm_cl_smm_kernel_t smmk;
     err = libysmm_cl_create_smm_kernel(&smmk, h, &smm, sizeof(smm), 0);
     if (err < 0)
     {
-        perror("Couldn't create a kernel");
+        fprintf(stderr, "Couldn't create a kernel %d\n", err);
         exit(1);
     }
 
-    err = libysmm_cl_bind_smm_kernel(smmk, bufA, bufB, bufC);
+    err = libysmm_cl_bind_smm_kernel(smmk, bufB, bufC);
     if (err < 0)
     {
-        perror("Couldn't create a kernel");
+        perror("Couldn't bind a kernel");
         exit(1);
     }
 
@@ -170,7 +168,6 @@ int main(int argc, char *argv[])
 
     printf("%f GFLOP/s\n%f GiB/s\n", gflops, gbytes);
 
-    clReleaseMemObject(bufA);
     clReleaseMemObject(bufB);
     clReleaseMemObject(bufC);
 

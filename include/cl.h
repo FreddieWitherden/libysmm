@@ -90,7 +90,6 @@ libysmm_cl_destory_smm_kernel(
 cl_int
 libysmm_cl_bind_smm_kernel(
     libysmm_cl_smm_kernel_t smmk,
-    cl_mem a,
     cl_mem b,
     cl_mem c
 );

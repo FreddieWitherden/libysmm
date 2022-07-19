@@ -45,6 +45,8 @@ typedef struct libysmm_smm
     double alpha;
     double beta;
 
+    void *a;
+
     int flags;
 } libysmm_smm_t;
 

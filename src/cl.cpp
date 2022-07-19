@@ -121,7 +121,7 @@ struct libysmm_cl_smm_kernel
     libysmm_cl_smm_kernel *clone();
 
     cl_int
-    bind(cl_mem a, cl_mem b, cl_mem c);
+    bind(cl_mem b, cl_mem c);
 
     cl_int
     enqueue(cl_command_queue queue,
@@ -133,6 +133,8 @@ struct libysmm_cl_smm_kernel
     libysmm_smm_t smm_;
 
     cl_kernel kernel_;
+    cl_mem a_;
+
     cl_uint work_dim_;
     size_t gs_[3];
     size_t ls_[3];
@@ -171,6 +173,9 @@ libysmm_cl_smm_kernel *
 libysmm_cl_smm_kernel::clone()
 {
     auto newk = new libysmm_cl_smm_kernel(*this);
+
+    if (a_)
+        clRetainMemObject(a_);
 
     if (kernel_)
     {
@@ -226,10 +231,23 @@ libysmm_cl_handle::smm_kernel(
         throw CL_INVALID_VALUE;
     }
 
-    auto smmk = new libysmm_cl_smm_kernel();
+    // Validate the A pointer
+    if (nullptr == smm->a)
+        throw CL_INVALID_VALUE;
+
+    auto smmk = std::make_unique<libysmm_cl_smm_kernel>();
     smmk->h_ = this;
     smmk->smm_ = *smm;
+    smmk->smm_.a = nullptr;
 
+    // Copy A
+    cl_int err;
+    smmk->a_ = clCreateBuffer(ctx_, CL_MEM_COPY_HOST_PTR,
+                              sizeof(float)*m*lda, smm->a, &err);
+    if (err < 0)
+        throw err;
+
+    // Render the kernel
     json tplargs = {
         {"M", m}, {"N", n}, {"K", k}, {"lda", lda}, {"ldb", ldb}, {"ldc", ldc},
         {"alpha", alpha}, {"beta", beta}, {"TM", 8}
@@ -238,7 +256,7 @@ libysmm_cl_handle::smm_kernel(
     std::string ksrc = inja::render(kern_basic, tplargs);
     const char *ksrcp = ksrc.c_str();
 
-    cl_int err;
+    // Build the program
     auto prg = clCreateProgramWithSource(ctx_, 1, &ksrcp, nullptr, &err);
     if (err < 0)
         throw err;
@@ -250,35 +268,41 @@ libysmm_cl_handle::smm_kernel(
         throw err;
     }
 
+    // Create the kernel
     smmk->kernel_ = clCreateKernel(prg, "mm", &err);
+
+    // Release the program, irrespective of if we created the kernel or not
+    clReleaseProgram(prg);
+
+    // See if we created the kernel
     if (err < 0)
-    {
-        clReleaseProgram(prg);
         throw err;
-    }
+
+    // Bind the argument
+    err = clSetKernelArg(smmk->kernel_, 0, sizeof(smmk->a_), &smmk->a_);
+    if (err < 0)
+        throw err;
 
     smmk->work_dim_ = 1;
     smmk->ls_[0] = 64;
     smmk->gs_[0] = ((n + smmk->ls_[0] - 1) / smmk->ls_[0])*smmk->ls_[0];
 
-    return smmk;
+    return smmk.release();
 }
 
 libysmm_cl_smm_kernel::~libysmm_cl_smm_kernel()
 {
+    if (a_)
+        clReleaseMemObject(a_);
     if (kernel_)
         clReleaseKernel(kernel_);
 }
 
 cl_int
 libysmm_cl_smm_kernel::bind(
-    cl_mem a,
     cl_mem b,
     cl_mem c)
 {
-    if (auto err = clSetKernelArg(kernel_, 0, sizeof(a), &a); err < 0)
-        return err;
-
     if (auto err = clSetKernelArg(kernel_, 1, sizeof(b), &b); err < 0)
         return err;
 
@@ -438,13 +462,12 @@ libysmm_cl_destory_smm_kernel(
 cl_int
 libysmm_cl_bind_smm_kernel(
     libysmm_cl_smm_kernel_t smmk,
-    cl_mem a,
     cl_mem b,
     cl_mem c)
 {
     assert(nullptr != smmk);
 
-    return smmk->bind(a, b, c);
+    return smmk->bind(b, c);
 }
 
 cl_int
