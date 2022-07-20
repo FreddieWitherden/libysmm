@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
     err = libysmm_cl_enqueue_smm_kernel(smmk, queue, 0, NULL, NULL);
     if (err < 0)
     {
-        perror("Couldn't enqueue a kernel");
+        fprintf(stderr, "Couldn't enqueue a kernel %d\n", err);
         exit(1);
     }
 
