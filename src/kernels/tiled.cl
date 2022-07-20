@@ -28,7 +28,7 @@ mm(__global const float* restrict a,
     for (int i = 0; i < 16; i++)
         c_acc[i] = 0;
 
-    // Loop over the tiles of A in (dM, dK) = (16, 6)
+    // Loop over the tiles of A in (M, dK) = (16, 4)
     for (int tk = 0; tk < k / 4; tk++, a += 32)
     {
         temp = block_read4f(a);
