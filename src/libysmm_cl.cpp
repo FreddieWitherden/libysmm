@@ -13,8 +13,19 @@
 
 using json = nlohmann::json;
 
+static inline
+int round_up(int numToRound, int multiple)
+{
+    assert(multiple);
+    return ((numToRound + multiple - 1) / multiple) * multiple;
+}
+
 const char *kern_basic =
 #include "kernels/basic.cl"
+;
+
+const char *kern_tiled =
+#include "kernels/tiled.cl"
 ;
 
 template<typename T, typename... Ts>
@@ -220,6 +231,16 @@ libysmm_cl_handle::smm_kernel(
     if (m <= 0 || n <= 0 || k <= 0)
         throw CL_INVALID_VALUE;
 
+    // Ensure the dimensions are valid for our tiled kernel
+    // TODO: Jason add clean up code to eliminate the m and k cases!
+    if (m % 16 || n % 32 || k % 4)
+        throw CL_INVALID_VALUE;
+
+    // Enusre beta is valid
+    // TODO: Jason add support for beta = 1
+    if (0 != beta)
+        throw CL_INVALID_VALUE;
+
     // Validate the data type
     if (LIBYSMM_DTYPE_FP32 != dtype)
         throw CL_INVALID_VALUE;
@@ -248,20 +269,38 @@ libysmm_cl_handle::smm_kernel(
     smmk->smm_ = *smm;
     smmk->smm_.a = nullptr;
 
+    /*
+     * Tile A.  Each tile is 8 by 4 with the tiles being packed next
+     * to each other in memory in a row-major order.  The contents of each
+     * tile are stored column-major.  Here, we also handle alpha.
+     */
+    const int trows = 8, tcols = 4;
+    const int tlda = round_up(k, tcols);
+    const int tm = round_up(m, trows);
+    std::vector<float> ta(tlda*tm, 0.0f);
+
+    for (int i = 0; i < m; i++)
+        for (int j = 0; j < k; j++)
+        {
+            int tr = i / trows, trr = i % trows;
+            int tc = j / tcols, tcc = j % tcols;
+            int idx = tr*trows*tlda + tc*trows*tcols + tcc*trows + trr;
+            ta[idx] = alpha*static_cast<float *>(smm->a)[i*lda + j];
+        }
+
     // Copy A
     cl_int err;
     smmk->a_ = clCreateBuffer(ctx_, CL_MEM_COPY_HOST_PTR,
-                              sizeof(float)*m*lda, smm->a, &err);
+                              sizeof(float)*ta.size(), ta.data(), &err);
     if (err < 0)
         throw err;
 
     // Render the kernel
     json tplargs = {
-        {"M", m}, {"N", n}, {"K", k}, {"lda", lda}, {"ldb", ldb}, {"ldc", ldc},
-        {"alpha", alpha}, {"beta", beta}, {"TM", 8}
+        {"lda", tlda}, {"ldb", ldb}, {"ldc", ldc}
     };
 
-    std::string ksrc = inja::render(kern_basic, tplargs);
+    std::string ksrc = inja::render(kern_tiled, tplargs);
     const char *ksrcp = ksrc.c_str();
 
     // Build the program
@@ -286,14 +325,29 @@ libysmm_cl_handle::smm_kernel(
     if (err < 0)
         throw err;
 
-    // Bind the argument
+    // Bind the static arguments
     err = clSetKernelArg(smmk->kernel_, 0, sizeof(smmk->a_), &smmk->a_);
     if (err < 0)
         throw err;
+    err = clSetKernelArg(smmk->kernel_, 3, sizeof(int), &k);
+    if (err < 0)
+        throw err;
 
-    smmk->work_dim_ = 1;
-    smmk->ls_[0] = 64;
-    smmk->gs_[0] = ((n + smmk->ls_[0] - 1) / smmk->ls_[0])*smmk->ls_[0];
+    smmk->work_dim_ = 2;
+
+    /*
+     * Set our global work size; each thread does 4 columns and 16 rows
+     */
+    smmk->gs_[0] = n / 4;
+    smmk->gs_[1] = m / 16;
+
+    /*
+     * Set the local work size; the determines how things are blocked;
+     * increase as applicable to improve performance.
+     * TODO: Jason, figure out the best values here!
+     */
+    smmk->ls_[0] = 1*8;
+    smmk->ls_[1] = 1;
 
     return smmk.release();
 }
