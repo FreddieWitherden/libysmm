@@ -224,8 +224,7 @@ libysmm_cl_handle::smm_kernel(
         throw CL_INVALID_VALUE;
 
     // Ensure the dimensions are valid for our tiled kernel
-    // TODO: Jason add clean up code to eliminate the m and k cases!
-    if (m % 16 || n % 32 || k % 4)
+    if (n % 32)
         throw CL_INVALID_VALUE;
 
     // Enusre beta is valid
@@ -289,7 +288,7 @@ libysmm_cl_handle::smm_kernel(
 
     // Render the kernel
     json tplargs = {
-        {"lda", tlda}, {"ldb", ldb}, {"ldc", ldc}
+        {"k_mod_4", k % 4}, {"m_mod_16", m % 16}
     };
 
     std::string ksrc = inja::render(kern_tiled, tplargs);
@@ -321,25 +320,30 @@ libysmm_cl_handle::smm_kernel(
     err = clSetKernelArg(smmk->kernel_, 0, sizeof(smmk->a_), &smmk->a_);
     if (err < 0)
         throw err;
-    err = clSetKernelArg(smmk->kernel_, 3, sizeof(int), &k);
-    if (err < 0)
-        throw err;
+
+    const int sargs[] = { m, n, k, tlda, ldb, ldc };
+    for (int i = 0; i < 6; i++)
+    {
+        err = clSetKernelArg(smmk->kernel_, i + 3, sizeof(int), &sargs[i]);
+        if (err < 0)
+            throw err;
+    }
 
     smmk->work_dim_ = 2;
 
-    /*
-     * Set our global work size; each thread does 4 columns and 16 rows
-     */
-    smmk->gs_[0] = n / 4;
-    smmk->gs_[1] = m / 16;
+    // Columns and rows per OpenCL thread (fixed)
+    const int cpt = 4;
+    const int rpt = 16;
 
-    /*
-     * Set the local work size; the determines how things are blocked;
-     * increase as applicable to improve performance.
-     * TODO: Jason, figure out the best values here!
-     */
-    smmk->ls_[0] = 1*8;
-    smmk->ls_[1] = 1;
+    // Blocking factors (adjustable, factor of 8 hardcoded from sub group size)
+    const int blk_c = 1*8;
+    const int blk_r = 1;
+
+    smmk->ls_[0] = blk_c;
+    smmk->ls_[1] = blk_r;
+
+    smmk->gs_[0] = round_up(n, cpt*blk_c) / cpt;
+    smmk->gs_[1] = round_up(m, rpt*blk_r) / rpt;
 
     return smmk.release();
 }

@@ -139,13 +139,14 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    float diff = 0;
+    double diff = -1;
     for (int i = 0; i < N*M; i++)
     {
-        diff += fabs(C[i] - refC[i]);
+        if (fabs(C[i] - refC[i]) > diff)
+            diff = fabs(C[i] - refC[i]);
     }
 
-    printf("Difference is: %f\n", diff);
+    printf("Max abs difference is: %f\n", diff);
 
     struct timeval begin, end;
     gettimeofday(&begin, NULL);
