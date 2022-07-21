@@ -8,15 +8,19 @@ __attribute__((intel_reqd_sub_group_size(8)))
 __kernel void
 mm(__global const float* restrict a,
    __global const float* restrict b,
-   __global float* restrict c, int k)
+   __global float* restrict c,
+   int m, int n, int k,
+   int lda, int ldb, int ldc)
 {
-    const int lda = {{ lda }}, ldb = {{ ldb }}, ldc = {{ ldc }};
-
     // Each thread does sixteen rows
     int g_row = 16*get_global_id(1);
 
     // Each sub-group of eight threads does 32 columns
     int g_col = 32*get_global_id(0) / 8;
+
+    // If we have no work to do then return
+    if (g_col >= n || g_row >= m)
+        return;
 
     // Pre-displace our arguments
     a += g_row*lda;
@@ -28,9 +32,36 @@ mm(__global const float* restrict a,
     for (int i = 0; i < 16; i++)
         c_acc[i] = 0;
 
-    // Loop over the tiles of A in (M, dK) = (16, 4)
-    for (int tk = 0; tk < k / 4; tk++, a += 32)
+## if m_mod_16
+    // Full M tile with 16 rows
+    if (g_row + 16 < m)
+## endif
     {
+        for (int tk = 0; tk < k / 4; tk++, a += 32)
+        {
+            temp = block_read4f(a);
+            #pragma unroll
+            for (int i = 0; i < 8; i++)
+                a_sub[i] = intel_sub_group_shuffle(temp, i);
+
+            temp = block_read4f(a + 8*lda);
+            #pragma unroll
+            for (int i = 0; i < 8; i++)
+                a_sub[i + 8] = intel_sub_group_shuffle(temp, i);
+
+            #pragma unroll
+            for (int i = 0; i < 4; i++, b += ldb)
+                b_sub[i] = block_read4f(b);
+
+## for p in range(4)
+            #pragma unroll
+            for (int i = 0; i < 16; i++)
+                c_acc[i] += a_sub[i].s{{p}}*b_sub[{{p}}];
+## endfor
+        }
+
+## if k_mod_4
+        // Partial K tile with {{k_mod_4}} columns
         temp = block_read4f(a);
         #pragma unroll
         for (int i = 0; i < 8; i++)
@@ -42,29 +73,80 @@ mm(__global const float* restrict a,
             a_sub[i + 8] = intel_sub_group_shuffle(temp, i);
 
         #pragma unroll
-        for (int i = 0; i < 4; i++, b += ldb)
+        for (int i = 0; i < {{k_mod_4}}; i++, b += ldb)
             b_sub[i] = block_read4f(b);
 
+## for p in range(k_mod_4)
         #pragma unroll
         for (int i = 0; i < 16; i++)
-            c_acc[i] += a_sub[i].s0*b_sub[0];
+            c_acc[i] += a_sub[i].s{{p}}*b_sub[{{p}}];
+## endfor
+## endif
 
+        // Write out the result
         #pragma unroll
-        for (int i = 0; i < 16; i++)
-            c_acc[i] += a_sub[i].s1*b_sub[1];
-
-        #pragma unroll
-        for (int i = 0; i < 16; i++)
-            c_acc[i] += a_sub[i].s2*b_sub[2];
-
-        #pragma unroll
-        for (int i = 0; i < 16; i++)
-            c_acc[i] += a_sub[i].s3*b_sub[3];
+        for (int i = 0; i < 16; i++, c += ldc)
+            block_write4f(c, c_acc[i]);
     }
+## if m_mod_16
+    // Partial M tile with {{m_mod_16}} rows
+    else
+    {
+        for (int tk = 0; tk < k / 4; tk++, a += 32)
+        {
+            temp = block_read4f(a);
+            #pragma unroll
+            for (int i = 0; i < 8; i++)
+                a_sub[i] = intel_sub_group_shuffle(temp, i);
 
-    // Write out the result
-    #pragma unroll
-    for (int i = 0; i < 16; i++, c += ldc)
-        block_write4f(c, c_acc[i]);
+## if m_mod_16 > 8
+            temp = block_read4f(a + 8*lda);
+            #pragma unroll
+            for (int i = 0; i < 8; i++)
+                a_sub[i + 8] = intel_sub_group_shuffle(temp, i);
+## endif
+
+            #pragma unroll
+            for (int i = 0; i < 4; i++, b += ldb)
+                b_sub[i] = block_read4f(b);
+
+## for p in range(4)
+            #pragma unroll
+            for (int i = 0; i < {{m_mod_16}}; i++)
+                c_acc[i] += a_sub[i].s{{p}}*b_sub[{{p}}];
+## endfor
+        }
+
+## if k_mod_4
+        // Partial K tile with {{k_mod_4}} columns
+        temp = block_read4f(a);
+        #pragma unroll
+        for (int i = 0; i < 8; i++)
+            a_sub[i] = intel_sub_group_shuffle(temp, i);
+## if m_mod_16 > 8
+        temp = block_read4f(a + 8*lda);
+        #pragma unroll
+        for (int i = 0; i < 8; i++)
+            a_sub[i + 8] = intel_sub_group_shuffle(temp, i);
+## endif
+
+        #pragma unroll
+        for (int i = 0; i < {{k_mod_4}}; i++, b += ldb)
+            b_sub[i] = block_read4f(b);
+
+## for p in range(k_mod_4)
+        #pragma unroll
+        for (int i = 0; i < {{m_mod_16}}; i++)
+            c_acc[i] += a_sub[i].s{{p}}*b_sub[{{p}}];
+
+## endfor
+## endif
+
+        // Write out the result
+        #pragma unroll
+        for (int i = 0; i < {{m_mod_16}}; i++, c += ldc)
+            block_write4f(c, c_acc[i]);
+    }
+## endif
 }
 )"
