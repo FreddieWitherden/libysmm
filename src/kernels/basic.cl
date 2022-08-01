@@ -13,7 +13,8 @@ mm(__global const float* restrict a,
    __global const float* restrict b,
    __global float* restrict c)
 {
-    const float alpha = {{ alpha }}, beta = {{ beta }};
+    const float alpha = {{ alpha }};
+
 
     const int cx = get_global_id(0);
     const int l_idx = get_local_id(0);
@@ -45,7 +46,8 @@ mm(__global const float* restrict a,
                 for (int k = 0; k < K; k++)
                     acc += l_a[j - i][k]*b[k*LDB + cx];
 
-                c[j*LDC + cx] = alpha*acc + beta*c[j*LDC + cx];
+                
+                c[j*LDC + cx] = alpha*acc;
             }
         }
 

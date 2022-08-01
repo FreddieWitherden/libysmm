@@ -145,8 +145,8 @@ int main(int argc, char *argv[])
         if (fabs(C[i] - refC[i]) > diff)
             diff = fabs(C[i] - refC[i]);
     }
-
-    printf("Max abs difference is: %f\n", diff);
+    printf("%d\n%d\n%d\n",M,N,K);
+    printf("%f\n", diff);
 
     struct timeval begin, end;
     gettimeofday(&begin, NULL);
@@ -167,7 +167,8 @@ int main(int argc, char *argv[])
     double gflops = NREPS*2*M*N*K / dt / 1e9;
     double gbytes = NREPS*4*(M + K)*N / dt / pow(1024, 3);
 
-    printf("%f GFLOP/s\n%f GiB/s\n", gflops, gbytes);
+    //printf("%f GFLOP/s\n%f GiB/s\n", gflops, gbytes);
+    printf("%f\n%f\n", gflops, gbytes); //To write the values directly to CSV file
 
     clReleaseMemObject(bufB);
     clReleaseMemObject(bufC);
