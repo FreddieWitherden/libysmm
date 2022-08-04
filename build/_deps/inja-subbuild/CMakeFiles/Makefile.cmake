@@ -10,10 +10,8 @@ set(CMAKE_MAKEFILE_DEPENDS
   "CMakeFiles/3.22.2/CMakeSystem.cmake"
   "CMakeLists.txt"
   "inja-populate-prefix/tmp/inja-populate-cfgcmd.txt.in"
-  "/usr/share/cmake/Modules/CMakeDetermineSystem.cmake"
   "/usr/share/cmake/Modules/CMakeGenericSystem.cmake"
   "/usr/share/cmake/Modules/CMakeInitializeConfigs.cmake"
-  "/usr/share/cmake/Modules/CMakeSystem.cmake.in"
   "/usr/share/cmake/Modules/CMakeSystemSpecificInformation.cmake"
   "/usr/share/cmake/Modules/CMakeSystemSpecificInitialize.cmake"
   "/usr/share/cmake/Modules/ExternalProject-download.cmake.in"
@@ -31,7 +29,6 @@ set(CMAKE_MAKEFILE_OUTPUTS
 
 # Byproducts of CMake generate step:
 set(CMAKE_MAKEFILE_PRODUCTS
-  "CMakeFiles/3.22.2/CMakeSystem.cmake"
   "inja-populate-prefix/src/inja-populate-stamp/inja-populate-urlinfo.txt"
   "inja-populate-prefix/src/inja-populate-stamp/download-inja-populate.cmake"
   "inja-populate-prefix/tmp/inja-populate-cfgcmd.txt"
