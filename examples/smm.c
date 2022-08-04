@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
     err = libysmm_cl_enqueue_smm_kernel(smmk, queue, 0, NULL, NULL);
     if (err < 0)
     {
-        perror("Couldn't enqueue a kernel");
+        fprintf(stderr, "Couldn't enqueue a kernel %d\n", err);
         exit(1);
     }
 
@@ -139,13 +139,14 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    float diff = 0;
+    double diff = -1;
     for (int i = 0; i < N*M; i++)
     {
-        diff += fabs(C[i] - refC[i]);
+        if (fabs(C[i] - refC[i]) > diff)
+            diff = fabs(C[i] - refC[i]);
     }
 
-    printf("Difference is: %f\n", diff);
+    printf("Max abs difference is: %f\n", diff);
 
     struct timeval begin, end;
     gettimeofday(&begin, NULL);
