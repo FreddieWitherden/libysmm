@@ -73,6 +73,12 @@ int main(int argc, char *argv[])
         B[i] = (float) rand() / (float) RAND_MAX;
     }
 
+    //Init'ing C
+    for (int i = 0; i < M*N; i++)
+    {
+        C[i] = (float) rand() / (float) RAND_MAX;
+    }
+
     for (int i = 0; i < M; i++)
     {
         for (int j = 0; j < N; j++)
@@ -82,7 +88,8 @@ int main(int argc, char *argv[])
             for (int k = 0; k < K; k++)
                 acc += A[i*K + k]*B[k*N + j];
 
-            refC[i*N + j] = acc;
+            //refC[i*N + j] = acc;
+            refC[i*N + j] = acc + C[i*N + j]; //refC init 
         }
     }
 
