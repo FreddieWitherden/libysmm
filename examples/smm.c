@@ -73,6 +73,12 @@ int main(int argc, char *argv[])
         B[i] = (float) rand() / (float) RAND_MAX;
     }
 
+    //Init'ing C
+    for (int i = 0; i < M*N; i++)
+    {
+        C[i] = (float) rand() / (float) RAND_MAX;
+    }
+
     for (int i = 0; i < M; i++)
     {
         for (int j = 0; j < N; j++)
@@ -82,7 +88,8 @@ int main(int argc, char *argv[])
             for (int k = 0; k < K; k++)
                 acc += A[i*K + k]*B[k*N + j];
 
-            refC[i*N + j] = acc;
+            //refC[i*N + j] = acc;
+            refC[i*N + j] = acc + C[i*N + j]; //refC init 
         }
     }
 
@@ -145,8 +152,8 @@ int main(int argc, char *argv[])
         if (fabs(C[i] - refC[i]) > diff)
             diff = fabs(C[i] - refC[i]);
     }
-
-    printf("Max abs difference is: %f\n", diff);
+    printf("%d\n%d\n%d\n",M,N,K);
+    printf("%f\n", diff);
 
     struct timeval begin, end;
     gettimeofday(&begin, NULL);
@@ -167,7 +174,8 @@ int main(int argc, char *argv[])
     double gflops = NREPS*2*M*N*K / dt / 1e9;
     double gbytes = NREPS*4*(M + K)*N / dt / pow(1024, 3);
 
-    printf("%f GFLOP/s\n%f GiB/s\n", gflops, gbytes);
+    //printf("%f GFLOP/s\n%f GiB/s\n", gflops, gbytes);
+    printf("%f\n%f\n", gflops, gbytes); //To write the values directly to CSV file
 
     clReleaseMemObject(bufB);
     clReleaseMemObject(bufC);

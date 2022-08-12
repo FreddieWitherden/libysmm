@@ -1,0 +1,1 @@
+/usr/lib64/ccache/c++ -fPIC -shared -Wl,-soname,libysmm-cl.so.0.1.0 -o libysmm-cl.so.0.1.0 CMakeFiles/ysmm-cl.dir/src/cl.cpp.o   -L/usr/lib64/libOpenCL.so  -Wl,-rpath,/usr/lib64/libOpenCL.so: -lOpenCL 

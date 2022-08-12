@@ -336,7 +336,7 @@ libysmm_cl_handle::smm_kernel(
     const int rpt = 16;
 
     // Blocking factors (adjustable, factor of 8 hardcoded from sub group size)
-    const int blk_c = 1*8;
+    const int blk_c = 2*8;
     const int blk_r = 1;
 
     smmk->ls_[0] = blk_c;

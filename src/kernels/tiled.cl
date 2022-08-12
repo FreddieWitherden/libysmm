@@ -12,6 +12,8 @@ mm(__global const float* restrict a,
    int m, int n, int k,
    int lda, int ldb, int ldc)
 {
+    //const float beta =  beta }}; //beta value
+
     // Each thread does sixteen rows
     int g_row = 16*get_global_id(1);
 
@@ -29,8 +31,8 @@ mm(__global const float* restrict a,
 
     float4 a_sub[16], b_sub[4], c_acc[16], temp;
 
-    for (int i = 0; i < 16; i++)
-        c_acc[i] = 0;
+    //for (int i = 0; i < 16; i++)
+    //    c_acc[i] = 0;
 
 ## if m_mod_16
     // Full M tile with 16 rows
@@ -52,6 +54,11 @@ mm(__global const float* restrict a,
             #pragma unroll
             for (int i = 0; i < 4; i++, b += ldb)
                 b_sub[i] = block_read4f(b);
+
+            //reading c values
+            #pragma unroll
+            for (int i = 0; i < 16; i++, c += ldc)
+                c_acc[i] = block_read4f(c);
 
 ## for p in range(4)
             #pragma unroll
@@ -138,6 +145,7 @@ mm(__global const float* restrict a,
         #pragma unroll
         for (int i = 0; i < {{m_mod_16}}; i++)
             c_acc[i] += a_sub[i].s{{p}}*b_sub[{{p}}];
+            //c_acc[i] += a_sub[i].s{{p}}*b_sub[{{p}}] + beta*c_acc[i];
 
 ## endfor
 ## endif

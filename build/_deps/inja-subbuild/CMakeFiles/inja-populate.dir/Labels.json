@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/nfs_home/jstanley/jason/libysmm/build/_deps/inja-subbuild/CMakeFiles/inja-populate"
+		},
+		{
+			"file" : "/nfs_home/jstanley/jason/libysmm/build/_deps/inja-subbuild/CMakeFiles/inja-populate.rule"
+		},
+		{
+			"file" : "/nfs_home/jstanley/jason/libysmm/build/_deps/inja-subbuild/CMakeFiles/inja-populate-complete.rule"
+		},
+		{
+			"file" : "/nfs_home/jstanley/jason/libysmm/build/_deps/inja-subbuild/inja-populate-prefix/src/inja-populate-stamp/inja-populate-build.rule"
+		},
+		{
+			"file" : "/nfs_home/jstanley/jason/libysmm/build/_deps/inja-subbuild/inja-populate-prefix/src/inja-populate-stamp/inja-populate-configure.rule"
+		},
+		{
+			"file" : "/nfs_home/jstanley/jason/libysmm/build/_deps/inja-subbuild/inja-populate-prefix/src/inja-populate-stamp/inja-populate-download.rule"
+		},
+		{
+			"file" : "/nfs_home/jstanley/jason/libysmm/build/_deps/inja-subbuild/inja-populate-prefix/src/inja-populate-stamp/inja-populate-install.rule"
+		},
+		{
+			"file" : "/nfs_home/jstanley/jason/libysmm/build/_deps/inja-subbuild/inja-populate-prefix/src/inja-populate-stamp/inja-populate-mkdir.rule"
+		},
+		{
+			"file" : "/nfs_home/jstanley/jason/libysmm/build/_deps/inja-subbuild/inja-populate-prefix/src/inja-populate-stamp/inja-populate-patch.rule"
+		},
+		{
+			"file" : "/nfs_home/jstanley/jason/libysmm/build/_deps/inja-subbuild/inja-populate-prefix/src/inja-populate-stamp/inja-populate-test.rule"
+		},
+		{
+			"file" : "/nfs_home/jstanley/jason/libysmm/build/_deps/inja-subbuild/inja-populate-prefix/src/inja-populate-stamp/inja-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"inja-populate"
+		],
+		"name" : "inja-populate"
+	}
+}

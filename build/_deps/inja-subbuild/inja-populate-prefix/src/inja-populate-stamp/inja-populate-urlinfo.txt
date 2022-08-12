@@ -1,0 +1,3 @@
+repository='external project URL'
+module='https://github.com/pantor/inja/archive/refs/tags/v3.3.0.tar.gz'
+tag=''
