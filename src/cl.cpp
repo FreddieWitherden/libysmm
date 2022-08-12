@@ -288,7 +288,7 @@ libysmm_cl_handle::smm_kernel(
 
     // Render the kernel
     json tplargs = {
-        {"k_mod_4", k % 4}, {"m_mod_16", m % 16}
+        {"k_mod_4", k % 4}, {"m_mod_8", m % 8}
     };
 
     std::string ksrc = inja::render(kern_tiled, tplargs);
@@ -333,7 +333,7 @@ libysmm_cl_handle::smm_kernel(
 
     // Columns and rows per OpenCL thread (fixed)
     const int cpt = 4;
-    const int rpt = 16;
+    const int rpt = 8;
 
     // Blocking factors (adjustable, factor of 8 hardcoded from sub group size)
     const int blk_c = 1*8;
