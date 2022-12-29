@@ -22,10 +22,10 @@ mm(__global const float* restrict a,
     if (g_col >= n || g_row >= m)
         return;
 
-    // Pre-displace our arguments
-    a += g_row*lda;
-    b += g_col;
-    c += g_row*ldc + g_col;
+    // Displacements
+    uint aoff = g_row*lda;
+    uint boff = g_col;
+    uint coff = g_row*ldc + g_col;
 
     float4 a_sub[16], b_sub[4], c_acc[16], temp;
 
@@ -37,21 +37,21 @@ mm(__global const float* restrict a,
     if (g_row + 16 < m)
 ## endif
     {
-        for (int tk = 0; tk < k / 4; tk++, a += 32)
+        for (int tk = 0; tk < k / 4; tk++, aoff += 32)
         {
-            temp = block_read4f(a);
+            temp = block_read4f(a + aoff);
             #pragma unroll
             for (int i = 0; i < 8; i++)
                 a_sub[i] = intel_sub_group_shuffle(temp, i);
 
-            temp = block_read4f(a + 8*lda);
+            temp = block_read4f(a + aoff + 8*lda);
             #pragma unroll
             for (int i = 0; i < 8; i++)
                 a_sub[i + 8] = intel_sub_group_shuffle(temp, i);
 
             #pragma unroll
-            for (int i = 0; i < 4; i++, b += ldb)
-                b_sub[i] = block_read4f(b);
+            for (int i = 0; i < 4; i++, boff += ldb)
+                b_sub[i] = block_read4f(b + boff);
 
 ## for p in range(4)
             #pragma unroll
@@ -62,19 +62,19 @@ mm(__global const float* restrict a,
 
 ## if k_mod_4
         // Partial K tile with {{k_mod_4}} columns
-        temp = block_read4f(a);
+        temp = block_read4f(a + aoff);
         #pragma unroll
         for (int i = 0; i < 8; i++)
             a_sub[i] = intel_sub_group_shuffle(temp, i);
 
-        temp = block_read4f(a + 8*lda);
+        temp = block_read4f(a + aoff + 8*lda);
         #pragma unroll
         for (int i = 0; i < 8; i++)
             a_sub[i + 8] = intel_sub_group_shuffle(temp, i);
 
         #pragma unroll
-        for (int i = 0; i < {{k_mod_4}}; i++, b += ldb)
-            b_sub[i] = block_read4f(b);
+        for (int i = 0; i < {{k_mod_4}}; i++, boff += ldb)
+            b_sub[i] = block_read4f(b + boff);
 
 ## for p in range(k_mod_4)
         #pragma unroll
@@ -85,30 +85,30 @@ mm(__global const float* restrict a,
 
         // Write out the result
         #pragma unroll
-        for (int i = 0; i < 16; i++, c += ldc)
-            block_write4f(c, c_acc[i]);
+        for (int i = 0; i < 16; i++, coff += ldc)
+            block_write4f(c + coff, c_acc[i]);
     }
 ## if m_mod_16
     // Partial M tile with {{m_mod_16}} rows
     else
     {
-        for (int tk = 0; tk < k / 4; tk++, a += 32)
+        for (int tk = 0; tk < k / 4; tk++, aoff += 32)
         {
-            temp = block_read4f(a);
+            temp = block_read4f(a + aoff);
             #pragma unroll
             for (int i = 0; i < 8; i++)
                 a_sub[i] = intel_sub_group_shuffle(temp, i);
 
 ## if m_mod_16 > 8
-            temp = block_read4f(a + 8*lda);
+            temp = block_read4f(a + aoff + 8*lda);
             #pragma unroll
             for (int i = 0; i < 8; i++)
                 a_sub[i + 8] = intel_sub_group_shuffle(temp, i);
 ## endif
 
             #pragma unroll
-            for (int i = 0; i < 4; i++, b += ldb)
-                b_sub[i] = block_read4f(b);
+            for (int i = 0; i < 4; i++, boff += ldb)
+                b_sub[i] = block_read4f(b + boff);
 
 ## for p in range(4)
             #pragma unroll
@@ -119,20 +119,20 @@ mm(__global const float* restrict a,
 
 ## if k_mod_4
         // Partial K tile with {{k_mod_4}} columns
-        temp = block_read4f(a);
+        temp = block_read4f(a + aoff);
         #pragma unroll
         for (int i = 0; i < 8; i++)
             a_sub[i] = intel_sub_group_shuffle(temp, i);
 ## if m_mod_16 > 8
-        temp = block_read4f(a + 8*lda);
+        temp = block_read4f(a + aoff + 8*lda);
         #pragma unroll
         for (int i = 0; i < 8; i++)
             a_sub[i + 8] = intel_sub_group_shuffle(temp, i);
 ## endif
 
         #pragma unroll
-        for (int i = 0; i < {{k_mod_4}}; i++, b += ldb)
-            b_sub[i] = block_read4f(b);
+        for (int i = 0; i < {{k_mod_4}}; i++, boff += ldb)
+            b_sub[i] = block_read4f(b + boff);
 
 ## for p in range(k_mod_4)
         #pragma unroll
@@ -144,8 +144,8 @@ mm(__global const float* restrict a,
 
         // Write out the result
         #pragma unroll
-        for (int i = 0; i < {{m_mod_16}}; i++, c += ldc)
-            block_write4f(c, c_acc[i]);
+        for (int i = 0; i < {{m_mod_16}}; i++, coff += ldc)
+            block_write4f(c + coff, c_acc[i]);
     }
 ## endif
 }
