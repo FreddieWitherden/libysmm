@@ -3,7 +3,7 @@
 
 #include <sys/time.h>
 
-#include "libysmm.h"
+#include "libysmm_cl.h"
 
 #define NREPS 20000
 
