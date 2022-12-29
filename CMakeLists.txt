@@ -7,8 +7,8 @@ set(LIBYSMM_VERSION_PATCH 0)
 set(LIBYSMM_VERSION "${LIBYSMM_VERSION_MAJOR}.${LIBYSMM_VERSION_MINOR}.${LIBYSMM_VERSION_PATCH}")
 
 # Config file
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/config.h.cmake
-               ${CMAKE_CURRENT_SOURCE_DIR}/include/config.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/libysmm_cl_config.h.cmake
+               ${CMAKE_CURRENT_SOURCE_DIR}/include/libysmm_cl_config.h)
 
 # CMake includes
 include(FetchContent)
@@ -26,7 +26,7 @@ FetchContent_Declare(inja URL https://github.com/pantor/inja/archive/refs/tags/v
 FetchContent_MakeAvailable(inja)
 
 add_library(ysmm-cl SHARED
-    src/cl.cpp
+    src/libysmm_cl.cpp
 )
 
 set_target_properties(ysmm-cl PROPERTIES VERSION ${PROJECT_VERSION})

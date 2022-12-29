@@ -7,8 +7,8 @@
 #include <nlohmann/json.hpp>
 #include <inja/inja.hpp>
 
-#include "cl.h"
-#include "config.h"
+#include "libysmm_cl.h"
+#include "libysmm_cl_config.h"
 
 using json = nlohmann::json;
 

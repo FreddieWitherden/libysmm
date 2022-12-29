@@ -1,7 +1,7 @@
-#ifndef LIBYSMM_CL_H
-#define LIBYSMM_CL_H
+#ifndef LIBYSMM_H
+#define LIBYSMM_H
 
-#include "common.h"
+#include "libysmm_cl_common.h"
 
 #ifndef CL_TARGET_OPENCL_VERSION
 #define CL_TARGET_OPENCL_VERSION 300
