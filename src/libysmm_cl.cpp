@@ -3,6 +3,7 @@
 #include <string>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 #include <inja/inja.hpp>
@@ -26,13 +27,12 @@ libysmm_query_string(const T& fn, Ts... args)
         throw err;
 
     // Allocate storage
-    char *temp = new char[sz];
-    if (cl_int err = fn(args..., sz, temp, nullptr); err < 0)
+    auto temp = std::vector<char>(sz);
+    if (cl_int err = fn(args..., sz, temp.data(), nullptr); err < 0)
         throw err;
 
     // Construct a string
-    std::string ret(temp);
-    delete[] temp;
+    std::string ret(temp.data());
 
     return ret;
 }
