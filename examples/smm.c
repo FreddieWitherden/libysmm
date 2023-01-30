@@ -5,36 +5,40 @@
 
 #include "libysmm_cl.h"
 
+#define MAX_PLATFORMS 16
+#define MAX_DEVICES 16
 #define NREPS 20000
 
-cl_device_id create_device()
+cl_device_id create_device(int plat_id, int dev_id)
 {
-    cl_platform_id platform;
-    cl_device_id dev;
+    cl_platform_id platforms[MAX_PLATFORMS];
+    cl_device_id devices[MAX_DEVICES];
     cl_int err;
+    cl_uint nplatforms, ndevices;
 
-    err = clGetPlatformIDs(1, &platform, NULL);
-    if (err < 0)
+    err = clGetPlatformIDs(MAX_PLATFORMS, platforms, &nplatforms);
+    if (err < 0 || plat_id < 0 || plat_id > nplatforms)
     {
         puts("Couldn't identify a platform\n");
         exit(1);
     }
 
-    err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &dev, NULL);
-    if (err < 0)
+    err = clGetDeviceIDs(platforms[plat_id], CL_DEVICE_TYPE_GPU, MAX_DEVICES,
+                         devices, &ndevices);
+    if (err < 0 || dev_id < 0 || dev_id > ndevices)
     {
-        puts("Couldn't access any devices\n");
+        puts("Couldn't identify a device\n");
         exit(1);
     }
 
-    return dev;
+    return devices[dev_id];
 }
 
 int main(int argc, char *argv[])
 {
     if (argc < 4)
     {
-        puts("Usage: M, N, K\n");
+        puts("Usage: M, N, K, [plat_id, [dev_id]]\n");
         exit(1);
     }
 
@@ -42,8 +46,11 @@ int main(int argc, char *argv[])
     size_t N = atoi(argv[2]);
     size_t K = atoi(argv[3]);
 
+    int plat_id = (argc >= 5) ? atoi(argv[4]) : 0;
+    int dev_id = (argc >= 6) ? atoi(argv[5]) : 0;
+
     cl_int err;
-    cl_device_id dev = create_device();
+    cl_device_id dev = create_device(plat_id, dev_id);
     cl_context ctx = clCreateContext(NULL, 1, &dev, NULL, NULL, &err);
     if (err < 0)
     {
