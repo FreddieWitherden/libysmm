@@ -67,6 +67,7 @@ struct libysmm_cl_device_properties
     std::string name;
     std::string extensions;
     bool has_dp;
+    bool has_intel_subgroups;
 };
 
 libysmm_cl_device_properties::libysmm_cl_device_properties(cl_device_id dev)
@@ -88,8 +89,15 @@ libysmm_cl_device_properties::libysmm_cl_device_properties(cl_device_id dev)
     extensions = libysmm_query_string(clGetDeviceInfo, dev,
                                       CL_DEVICE_EXTENSIONS);
 
-    // See if we have double precision support
-    has_dp = extensions.find("cl_khr_fp64") != extensions.npos;
+    auto has_ext = [&](const char *name)
+    {
+        return extensions.find(name) != extensions.npos;
+    };
+
+    // Query common extensions
+    has_dp = has_ext("cl_khr_fp64");
+    has_intel_subgroups = (has_ext("cl_intel_subgroups") &&
+                           has_ext("cl_intel_required_subgroup_size"));
 }
 
 libysmm_cl_device_properties::~libysmm_cl_device_properties()
@@ -328,7 +336,19 @@ libysmm_cl_smm_kernel::enqueue(
 libysmm_support_level_t
 libysmm_cl_get_support_level(cl_device_id id)
 {
-    return LIBYSMM_SUPPORT_LEVEL_BASIC;
+    try
+    {
+        libysmm_cl_device_properties props(id);
+
+        if (props.has_intel_subgroups)
+            return LIBYSMM_SUPPORT_LEVEL_TUNED;
+        else
+            return LIBYSMM_SUPPORT_LEVEL_BASIC;
+    }
+    catch (...)
+    {
+        return LIBYSMM_SUPPORT_LEVEL_NONE;
+    }
 }
 
 cl_int
