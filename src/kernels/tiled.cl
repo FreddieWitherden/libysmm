@@ -86,7 +86,14 @@ mm(__global const float* restrict a,
         // Write out the result
         #pragma unroll
         for (int i = 0; i < 16; i++, coff += ldc)
+## if beta == 0
             block_write4f(c + coff, c_acc[i]);
+## else if beta == 1
+            block_write4f(c + coff, c_acc[i] + block_read4f(c + coff));
+## else
+            block_write4f(c + coff, c_acc[i] + {{beta}}*block_read4f(c + coff));
+## endif
+
     }
 ## if m_mod_16
     // Partial M tile with {{m_mod_16}} rows
@@ -145,7 +152,13 @@ mm(__global const float* restrict a,
         // Write out the result
         #pragma unroll
         for (int i = 0; i < {{m_mod_16}}; i++, coff += ldc)
+## if beta == 0
             block_write4f(c + coff, c_acc[i]);
+## else if beta == 1
+            block_write4f(c + coff, c_acc[i] + block_read4f(c + coff));
+## else
+            block_write4f(c + coff, c_acc[i] + {{beta}}*block_read4f(c + coff));
+## endif
     }
 ## endif
 }

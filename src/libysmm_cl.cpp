@@ -235,11 +235,6 @@ libysmm_cl_handle::smm_kernel(
     if (n % 32)
         throw CL_INVALID_VALUE;
 
-    // Enusre beta is valid
-    // TODO: Jason add support for beta = 1
-    if (0 != beta)
-        throw CL_INVALID_VALUE;
-
     // Validate the data type
     if (LIBYSMM_DTYPE_FP32 != dtype)
         throw CL_INVALID_VALUE;
@@ -296,7 +291,7 @@ libysmm_cl_handle::smm_kernel(
 
     // Render the kernel
     json tplargs = {
-        {"k_mod_4", k % 4}, {"m_mod_16", m % 16}
+        {"beta", beta}, {"k_mod_4", k % 4}, {"m_mod_16", m % 16}
     };
 
     std::string ksrc = inja::render(kern_tiled, tplargs);
