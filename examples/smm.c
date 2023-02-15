@@ -58,7 +58,9 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    cl_command_queue queue = clCreateCommandQueue(ctx, dev, 0, &err);
+    cl_command_queue_properties props[] = { CL_QUEUE_PROPERTIES, 0, 0 };
+    cl_command_queue queue = clCreateCommandQueueWithProperties(ctx, dev,
+                                                                props, &err);
     if (err < 0)
     {
         puts("Couldn't create a queue\n");
