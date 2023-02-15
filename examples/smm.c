@@ -36,9 +36,9 @@ cl_device_id create_device(int plat_id, int dev_id)
 
 int main(int argc, char *argv[])
 {
-    if (argc < 4)
+    if (argc < 5)
     {
-        puts("Usage: M, N, K, [plat_id, [dev_id]]\n");
+        puts("Usage: M, N, K, beta, [plat_id, [dev_id]]\n");
         exit(1);
     }
 
@@ -46,8 +46,10 @@ int main(int argc, char *argv[])
     size_t N = atoi(argv[2]);
     size_t K = atoi(argv[3]);
 
-    int plat_id = (argc >= 5) ? atoi(argv[4]) : 0;
-    int dev_id = (argc >= 6) ? atoi(argv[5]) : 0;
+    double beta = atof(argv[4]);
+
+    int plat_id = (argc >= 6) ? atoi(argv[5]) : 0;
+    int dev_id = (argc >= 7) ? atoi(argv[6]) : 0;
 
     cl_int err;
     cl_device_id dev = create_device(plat_id, dev_id);
@@ -111,11 +113,9 @@ int main(int argc, char *argv[])
 
     libysmm_smm_t smm = {
         .dtype = LIBYSMM_DTYPE_FP32,
-        .layout = LIBYSMM_LAYOUT_ROW_MAJOR,
-        .transpose = LIBYSMM_TRANSPOSE_NN,
         .m = M, .n = N, .k = K,
         .lda = K, .ldb = N, .ldc = N,
-        .alpha = 1.0, .beta = 0,
+        .alpha = 1.0, .beta = beta,
         .a = A, .flags = 0
     };
 
@@ -174,7 +174,7 @@ int main(int argc, char *argv[])
     double dt = (end.tv_sec - begin.tv_sec)
               + ((end.tv_usec - begin.tv_usec) / 1000000.0);
     double gflops = NREPS*2*M*N*K / dt / 1e9;
-    double gbytes = NREPS*4*(M + K)*N / dt / pow(1024, 3);
+    double gbytes = NREPS*4*((1 + (beta != 0))*M + K)*N / dt / pow(1024, 3);
 
     printf("%f GFLOP/s\n%f GiB/s\n", gflops, gbytes);
 

@@ -339,8 +339,6 @@ libysmm_cl_handle::smm_kernel(
     std::scoped_lock guard(lock_);
 
     libysmm_dtype_t dtype = smm->dtype;
-    libysmm_layout_t layout = smm->layout;
-    libysmm_transpose_t transpose = smm->transpose;
 
     int m = smm->m, n = smm->n, k = smm->k;
     int lda = smm->lda, ldb = smm->ldb, ldc = smm->ldc;
@@ -359,20 +357,9 @@ libysmm_cl_handle::smm_kernel(
     if (LIBYSMM_DTYPE_FP32 != dtype)
         throw CL_INVALID_VALUE;
 
-    // Validate the transpose
-    if (LIBYSMM_TRANSPOSE_NN != transpose)
-        throw CL_INVALID_VALUE;
-
     // Validate the layout
-    if (LIBYSMM_LAYOUT_ROW_MAJOR == layout)
-    {
-        if (k > lda || n > ldb || n > ldc)
-            throw CL_INVALID_VALUE;
-    }
-    else
-    {
+    if (k > lda || n > ldb || n > ldc)
         throw CL_INVALID_VALUE;
-    }
 
     // Validate the A pointer
     if (nullptr == smm->a)
