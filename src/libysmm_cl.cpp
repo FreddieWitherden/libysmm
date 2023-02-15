@@ -52,6 +52,29 @@ libysmm_query_string(const T& fn, Ts... args)
     return ret;
 }
 
+template<typename F>
+static
+auto
+libysmm_tile_matrix(int m, int k, int trows, int tcols, F f)
+{
+    const int tlda = libysmm_round_up(k, tcols);
+    const int tm = libysmm_round_up(m, trows);
+    std::vector<decltype(f(0, 0))> mat(tlda*tm, 0);
+
+    for (int i = 0; i < m; i++)
+    {
+        for (int j = 0; j < k; j++)
+        {
+            int tr = i / trows, trr = i % trows;
+            int tc = j / tcols, tcc = j % tcols;
+            int idx = tr*trows*tlda + tc*trows*tcols + tcc*trows + trr;
+            mat[idx] = f(i, j);
+        }
+    }
+
+    return std::make_tuple(mat, tm, tlda);
+}
+
 static inline
 double
 libysmm_event_profiling_info(cl_event event, cl_profiling_info param)
@@ -360,24 +383,12 @@ libysmm_cl_handle::smm_kernel(
     smmk->smm_ = *smm;
     smmk->smm_.a = nullptr;
 
-    /*
-     * Tile A.  Each tile is 8 by 4 with the tiles being packed next
-     * to each other in memory in a row-major order.  The contents of each
-     * tile are stored column-major.  Here, we also handle alpha.
-     */
-    const int trows = 8, tcols = 4;
-    const int tlda = libysmm_round_up(k, tcols);
-    const int tm = libysmm_round_up(m, trows);
-    std::vector<float> ta(tlda*tm, 0.0f);
-
-    for (int i = 0; i < m; i++)
-        for (int j = 0; j < k; j++)
-        {
-            int tr = i / trows, trr = i % trows;
-            int tc = j / tcols, tcc = j % tcols;
-            int idx = tr*trows*tlda + tc*trows*tcols + tcc*trows + trr;
-            ta[idx] = alpha*static_cast<float *>(smm->a)[i*lda + j];
-        }
+    // Tile the matrix
+    auto a_at = [&](int i, int j) -> float
+    {
+        return alpha*static_cast<float *>(smm->a)[i*lda + j];
+    };
+    auto [ta, tm, tk] = libysmm_tile_matrix(m, k, 8, 4, a_at);
 
     // Copy A
     cl_int err;
@@ -403,7 +414,7 @@ libysmm_cl_handle::smm_kernel(
     if (err < 0)
         throw err;
 
-    const int sargs[] = { m, n, k, tlda, ldb, ldc };
+    const int sargs[] = { m, n, k, tk, ldb, ldc };
     for (int i = 0; i < 6; i++)
     {
         err = clSetKernelArg(smmk->kernel_, i + 3, sizeof(int), &sargs[i]);
