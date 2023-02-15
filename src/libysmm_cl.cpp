@@ -1,7 +1,9 @@
 #include <cassert>
+#include <chrono>
+#include <map>
+#include <memory>
 #include <mutex>
 #include <string>
-#include <memory>
 #include <utility>
 #include <vector>
 
@@ -48,6 +50,56 @@ libysmm_query_string(const T& fn, Ts... args)
     std::string ret(temp.data());
 
     return ret;
+}
+
+static inline
+double
+libysmm_event_profiling_info(cl_event event, cl_profiling_info param)
+{
+    cl_ulong t;
+
+    cl_int err = clGetEventProfilingInfo(event, param, sizeof(t), &t, nullptr);
+    if (err < 0)
+        throw err;
+
+    return t / 1e9;
+}
+
+static inline
+double
+libysmm_event_profiling_dt(cl_event start, cl_event end)
+{
+    return libysmm_event_profiling_info(end, CL_PROFILING_COMMAND_END) -
+           libysmm_event_profiling_info(start, CL_PROFILING_COMMAND_START);
+}
+
+class libysmm_timer
+{
+public:
+    libysmm_timer() : start_(now())
+    {}
+
+    double elapsed() const
+    { return now() - start_; }
+
+    void reset()
+    { start_ = now(); }
+
+private:
+    static double now();
+
+    double start_;
+};
+
+inline double
+libysmm_timer::now()
+{
+    using namespace std::chrono;
+
+    auto t = high_resolution_clock::now().time_since_epoch();
+    auto d = duration_cast<duration<double>>(t);
+
+    return d.count();
 }
 
 struct libysmm_cl_platform
@@ -121,6 +173,7 @@ libysmm_cl_device_properties::~libysmm_cl_device_properties()
 struct libysmm_cl_handle
 {
     libysmm_cl_handle(cl_context ctx, cl_device_id dev, int flags);
+    ~libysmm_cl_handle();
 
     std::string
     serialize() const;
@@ -131,8 +184,12 @@ struct libysmm_cl_handle
     libysmm_cl_smm_kernel *
     smm_kernel(const libysmm_smm_t *smm, double timeout);
 
+    cl_program
+    build_program(const std::string &tpl, const json &args);
+
     cl_context ctx_;
     libysmm_cl_device_properties dev_props_;
+    std::map<std::pair<std::string, json>, cl_program> prog_cache_;
     mutable std::mutex lock_;
 };
 
@@ -169,6 +226,12 @@ libysmm_cl_handle::libysmm_cl_handle(
     , dev_props_(dev)
 {
     assert(0 == flags);
+}
+
+libysmm_cl_handle::~libysmm_cl_handle()
+{
+    for (const auto &kv : prog_cache_)
+        clReleaseProgram(kv.second);
 }
 
 std::string
@@ -211,6 +274,38 @@ libysmm_cl_smm_kernel::clone()
     }
 
     return newk;
+}
+
+cl_program
+libysmm_cl_handle::build_program(
+    const std::string &tpl,
+    const json &tplargs)
+{
+    // Check the cache
+    if (auto it = prog_cache_.find({tpl, tplargs}); it != prog_cache_.end())
+        return it->second;
+
+    std::string ksrc = inja::render(tpl, tplargs);
+    const char *ksrcp = ksrc.c_str();
+
+    // Create the program
+    cl_int err;
+    cl_program prog = clCreateProgramWithSource(ctx_, 1, &ksrcp, nullptr, &err);
+    if (err < 0)
+        throw err;
+
+    // Build the program
+    err = clBuildProgram(prog, 1, &dev_props_.dev_id, nullptr, nullptr,
+                         nullptr);
+    if (err < 0)
+    {
+        clReleaseProgram(prog);
+        throw err;
+    }
+
+    // Insert it into the cache and return
+    prog_cache_[{tpl, tplargs}] = prog;
+    return prog;
 }
 
 libysmm_cl_smm_kernel *
@@ -292,32 +387,14 @@ libysmm_cl_handle::smm_kernel(
         throw err;
 
     // Render the kernel
-    json tplargs = {
+    const json tplargs = {
         {"beta", beta}, {"k_mod_4", k % 4}, {"m_mod_16", m % 16}
     };
 
-    std::string ksrc = inja::render(kern_tiled, tplargs);
-    const char *ksrcp = ksrc.c_str();
+    cl_program prog = build_program(kern_tiled, tplargs);
 
-    // Build the program
-    auto prg = clCreateProgramWithSource(ctx_, 1, &ksrcp, nullptr, &err);
-    if (err < 0)
-        throw err;
-
-    err = clBuildProgram(prg, 1, &dev_props_.dev_id, nullptr, nullptr, nullptr);
-    if (err < 0)
-    {
-        clReleaseProgram(prg);
-        throw err;
-    }
-
-    // Create the kernel
-    smmk->kernel_ = clCreateKernel(prg, "mm", &err);
-
-    // Release the program, irrespective of if we created the kernel or not
-    clReleaseProgram(prg);
-
-    // See if we created the kernel
+    // Create the kernel (should not fail)
+    smmk->kernel_ = clCreateKernel(prog, "mm", &err);
     if (err < 0)
         throw err;
 
