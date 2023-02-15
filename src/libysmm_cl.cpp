@@ -11,15 +11,6 @@
 #include "libysmm_cl.h"
 #include "libysmm_cl_config.h"
 
-using json = nlohmann::json;
-
-static inline
-int round_up(int numToRound, int multiple)
-{
-    assert(multiple);
-    return ((numToRound + multiple - 1) / multiple) * multiple;
-}
-
 const char *kern_basic =
 #include "kernels/basic.cl"
 ;
@@ -28,7 +19,18 @@ const char *kern_tiled =
 #include "kernels/tiled.cl"
 ;
 
+using json = nlohmann::json;
+
+static inline
+int
+libysmm_round_up(int numToRound, int multiple)
+{
+    assert(multiple);
+    return ((numToRound + multiple - 1) / multiple) * multiple;
+}
+
 template<typename T, typename... Ts>
+static inline
 std::string
 libysmm_query_string(const T& fn, Ts... args)
 {
@@ -145,8 +147,8 @@ struct libysmm_cl_smm_kernel
     cl_int
     enqueue(cl_command_queue queue,
             cl_uint num_events_in_wait_list,
-            const cl_event* event_wait_list,
-            cl_event* event);
+            const cl_event *event_wait_list,
+            cl_event *event);
 
     libysmm_cl_handle *h_;
     libysmm_smm_t smm_;
@@ -269,8 +271,8 @@ libysmm_cl_handle::smm_kernel(
      * tile are stored column-major.  Here, we also handle alpha.
      */
     const int trows = 8, tcols = 4;
-    const int tlda = round_up(k, tcols);
-    const int tm = round_up(m, trows);
+    const int tlda = libysmm_round_up(k, tcols);
+    const int tm = libysmm_round_up(m, trows);
     std::vector<float> ta(tlda*tm, 0.0f);
 
     for (int i = 0; i < m; i++)
@@ -345,8 +347,8 @@ libysmm_cl_handle::smm_kernel(
     smmk->ls_[0] = blk_c;
     smmk->ls_[1] = blk_r;
 
-    smmk->gs_[0] = round_up(n, cpt*blk_c) / cpt;
-    smmk->gs_[1] = round_up(m, rpt*blk_r) / rpt;
+    smmk->gs_[0] = libysmm_round_up(n, cpt*blk_c) / cpt;
+    smmk->gs_[1] = libysmm_round_up(m, rpt*blk_r) / rpt;
 
     return smmk.release();
 }
@@ -421,7 +423,7 @@ libysmm_cl_create_handle(
     {
         return err;
     }
-    catch (const std::bad_alloc&)
+    catch (const std::bad_alloc &)
     {
         return CL_OUT_OF_HOST_MEMORY;
     }
@@ -515,7 +517,7 @@ libysmm_cl_create_smm_kernel(
     {
         return err;
     }
-    catch (const std::bad_alloc&)
+    catch (const std::bad_alloc &)
     {
         return CL_OUT_OF_HOST_MEMORY;
     }
@@ -574,7 +576,7 @@ libysmm_cl_clone_smm_kernel(
     {
         return err;
     }
-    catch (const std::bad_alloc&)
+    catch (const std::bad_alloc &)
     {
         return CL_OUT_OF_HOST_MEMORY;
     }
