@@ -3,6 +3,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
@@ -47,9 +48,18 @@ libysmm_query_string(const T& fn, Ts... args)
         throw err;
 
     // Construct a string
-    std::string ret(temp.data());
+    return std::string(temp.data());
+}
 
-    return ret;
+template<typename T>
+std::vector<T> libysmm_random_vec(size_t n, T min=0.1, T max=1.0)
+{
+    std::default_random_engine gen;
+    std::uniform_real_distribution<T> dist(min, max);
+
+    std::vector<T> mat(n);
+    std::generate(mat.begin(), mat.end(), [&]() { return dist(gen); });
+    return mat;
 }
 
 template<typename F>
@@ -82,10 +92,7 @@ libysmm_event_profiling_info(cl_event event, cl_profiling_info param)
     cl_ulong t;
 
     cl_int err = clGetEventProfilingInfo(event, param, sizeof(t), &t, nullptr);
-    if (err < 0)
-        throw err;
-
-    return t / 1e9;
+    return (err) ? -1 : t / 1e9;
 }
 
 static inline
@@ -212,6 +219,7 @@ struct libysmm_cl_handle
 
     cl_context ctx_;
     libysmm_cl_device_properties dev_props_;
+    cl_command_queue queue_;
     std::map<std::pair<std::string, json>, cl_program> prog_cache_;
     mutable std::mutex lock_;
 };
@@ -249,10 +257,19 @@ libysmm_cl_handle::libysmm_cl_handle(
     , dev_props_(dev)
 {
     assert(0 == flags);
+
+    // Attempt to create a command queue for profiling
+    const cl_command_queue_properties props[] = {
+        CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE, 0
+    };
+    queue_ = clCreateCommandQueueWithProperties(ctx, dev, props, nullptr);
 }
 
 libysmm_cl_handle::~libysmm_cl_handle()
 {
+    if (queue_)
+        clReleaseCommandQueue(queue_);
+
     for (const auto &kv : prog_cache_)
         clReleaseProgram(kv.second);
 }
@@ -331,6 +348,71 @@ libysmm_cl_handle::build_program(
     return prog;
 }
 
+template<typename T>
+double
+libysmm_benchmark_kernel(cl_context ctx, cl_command_queue queue,
+                         std::unique_ptr<libysmm_cl_smm_kernel> &kern,
+                         int nbench = 50)
+{
+    double ret = -1;
+
+    size_t b_sz = kern->smm_.k*kern->smm_.ldb;
+    size_t c_sz = kern->smm_.m*kern->smm_.ldc;
+
+    auto rand = libysmm_random_vec<T>(std::max(b_sz, c_sz));
+
+    // Swap out the kernel for a clone so we can bind the arguments
+    cl_kernel orig_kernel = kern->kernel_;
+    kern->kernel_ = clCloneKernel(orig_kernel, nullptr);
+
+    // Allocate some temporary buffers for the kernel to use
+    cl_mem b_buf = clCreateBuffer(ctx, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                  b_sz*sizeof(T), rand.data(), nullptr);
+    cl_mem c_buf = clCreateBuffer(ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                  c_sz*sizeof(T), rand.data(), nullptr);
+
+    if (kern->kernel_ && b_buf && c_buf)
+    {
+        cl_event start = nullptr, end = nullptr;
+
+        // Configure the kernel arguments
+        cl_int err = kern->bind(b_buf, c_buf);
+
+        // Benchmark the kernel
+        for (int i = 0; !err && i < nbench + 1; i++)
+        {
+            if (1 == i)
+                err = kern->enqueue(queue, 0, nullptr, &start);
+            else if (nbench == i)
+                err = kern->enqueue(queue, 0, nullptr, &end);
+            else
+                err = kern->enqueue(queue, 0, nullptr, nullptr);
+        }
+
+        // Wait for the kernels to finish and measure the time
+        if (!clFinish(queue) && !err)
+            ret = libysmm_event_profiling_dt(start, end);
+
+        if (start)
+            clReleaseEvent(start);
+        if (end)
+            clReleaseEvent(end);
+    }
+
+    // Release cloned kernel and our buffers
+    if (kern->kernel_)
+        clReleaseKernel(kern->kernel_);
+    if (b_buf)
+        clReleaseMemObject(b_buf);
+    if (c_buf)
+        clReleaseMemObject(c_buf);
+
+    // Restore the old kernel
+    kern->kernel_ = orig_kernel;
+
+    return ret;
+}
+
 libysmm_cl_smm_kernel *
 libysmm_cl_handle::smm_kernel(
     const libysmm_smm_t *smm,
@@ -398,16 +480,13 @@ libysmm_cl_handle::smm_kernel(
 
     // Bind the static arguments
     err = clSetKernelArg(smmk->kernel_, 0, sizeof(smmk->a_), &smmk->a_);
-    if (err < 0)
-        throw err;
 
     const int sargs[] = { m, n, k, tk, ldb, ldc };
-    for (int i = 0; i < 6; i++)
-    {
+    for (int i = 0; CL_SUCCESS == err && i < 6; i++)
         err = clSetKernelArg(smmk->kernel_, i + 3, sizeof(int), &sargs[i]);
-        if (err < 0)
-            throw err;
-    }
+
+    if (err < 0)
+        throw err;
 
     smmk->work_dim_ = 2;
 
@@ -415,15 +494,40 @@ libysmm_cl_handle::smm_kernel(
     const int cpt = 4;
     const int rpt = 16;
 
-    // Blocking factors (adjustable, factor of 8 hardcoded from sub group size)
-    const int blk_c = 1*8;
-    const int blk_r = 1;
+    // Possible blocking factors
+    const int blockings[][2] = {
+        {1, 1}, {2, 1}, {1, 2}, {2, 2}, {2, 4}, {4, 2}, {4, 4}
+    };
+    int best_blk_c = blockings[0][0], best_blk_r = blockings[0][1];
+    double best_dt = 0;
 
-    smmk->ls_[0] = blk_c;
-    smmk->ls_[1] = blk_r;
+    // Benchmark the factors to see which one is best
+    if (queue_)
+    {
+        for (auto [blk_c, blk_r] : blockings)
+        {
+            smmk->ls_[0] = 8*blk_c;
+            smmk->ls_[1] = blk_r;
 
-    smmk->gs_[0] = libysmm_round_up(n, cpt*blk_c) / cpt;
-    smmk->gs_[1] = libysmm_round_up(m, rpt*blk_r) / rpt;
+            smmk->gs_[0] = libysmm_round_up(n, 8*cpt*blk_c) / cpt;
+            smmk->gs_[1] = libysmm_round_up(m, rpt*blk_r) / rpt;
+
+            double dt = libysmm_benchmark_kernel<float>(ctx_, queue_, smmk);
+            if (0 == best_dt || (dt > 0 && dt < best_dt))
+            {
+                best_blk_c = blk_c;
+                best_blk_r = blk_r;
+                best_dt = dt;
+            }
+        }
+    }
+
+    // Go with the best set of factors
+    smmk->ls_[0] = 8*best_blk_c;
+    smmk->ls_[1] = best_blk_r;
+
+    smmk->gs_[0] = libysmm_round_up(n, 8*cpt*best_blk_c) / cpt;
+    smmk->gs_[1] = libysmm_round_up(m, rpt*best_blk_r) / rpt;
 
     return smmk.release();
 }
